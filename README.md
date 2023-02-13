@@ -1,1 +1,2 @@
 # ModelDiagnostics
+This is basic MLops task where we are using evidently.ai framework to check various statistical and model deviation of a particular model.  Training a model is expensive and time consuming one, once we get to know how the model is being degraded and what metrics are to be taken care and when we have to retrain our model again to achieve requisite results. The aim is to automate the process using Mlflow and integrate it on grafana dashboard.
