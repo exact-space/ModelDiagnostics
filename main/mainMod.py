@@ -1,5 +1,17 @@
 import warnings
 
+from evidently import ColumnMapping
+
+from evidently.report import Report
+from evidently.metrics.base_metric import generate_column_metrics
+from evidently.metric_preset import DataDriftPreset, TargetDriftPreset
+from evidently.metrics import *
+
+from evidently.test_suite import TestSuite
+from evidently.tests.base_test import generate_column_tests
+from evidently.test_preset import DataStabilityTestPreset, NoTargetPerformanceTestPreset
+from evidently.tests import *
+
 warnings.filterwarnings("ignore")
 import pandas as pd
 import numpy as np
@@ -128,9 +140,56 @@ def downloadingFile(fileName):
 
 
 def gettingTimeStamp(date):
-    date = datetime.datetime.strptime(date, "%d-%m-%YT%H:%M:%S")
-    timestamp = datetime.datetime.timestamp(date)
+    date = datetime.strptime(date, "%d-%m-%YT%H:%M:%S")
+    timestamp = datetime.timestamp(date)
     return timestamp
+
+
+def getValuesV2(tagList, startTime, endTime):
+    url = config["api"]["query"]
+    metrics = []
+    for tag in tagList:
+        tagDict = {
+            "tags": {},
+            "name": tag,
+            "aggregators": [
+                {
+                    "name": "avg",
+                    "sampling": {"value": "1", "unit": "minutes"},
+                    "align_end_time": True,
+                }
+            ],
+        }
+        metrics.append(tagDict)
+
+    query = {
+        "metrics": metrics,
+        "plugins": [],
+        "cache_time": 0,
+        "start_absolute": startTime,
+        "end_absolute": endTime,
+    }
+    #     print(json.dumps(query,indent=4))
+    res = requests.post(url=url, json=query)
+    values = json.loads(res.content)
+    finalDF = pd.DataFrame()
+    for i in values["queries"]:
+        df = pd.DataFrame(
+            i["results"][0]["values"], columns=["time", i["results"][0]["name"]]
+        )
+
+        try:
+            finalDF = pd.concat([finalDF, df.set_index("time")], axis=1)
+        except Exception as e:
+            print(e)
+            finalDF = pd.concat([finalDF, df], axis=1)
+
+    finalDF.reset_index(inplace=True)
+    finalDF.fillna(method="ffill", inplace=True)
+    finalDF.fillna(method="bfill", inplace=True)
+
+    # print(dates)
+    return finalDF
 
 
 modelId = "63a0b29d8c8c0600070c22e0"
@@ -142,6 +201,8 @@ modelTags = getTagsFromModelDetailes(modelDetails)
 
 inputTags = modelTags["inputTags"]
 outputTags = modelTags["outputTags"]
+totalTags = inputTags + outputTags
+
 
 versionHist, currentVersion = getLatestVersionHistoryFromModelId(modelId)
 
@@ -154,10 +215,11 @@ transFileName = modelId + "_Version" + str(currentVersion) + "_Transformer.pkl"
 
 refStartTime = versionHist["modelTime"]["train"]
 refStartTime = refStartTime[0]["startTime"]
-refStartTime = gettingTimeStamp(refStartTime)
+refStartTime = gettingTimeStamp(refStartTime) * 1000
 refEndTime = versionHist["modelTime"]["train"]
 refEndTime = refEndTime[0]["endTime"]
-refEndTime = gettingTimeStamp(refEndTime)
+refEndTime = gettingTimeStamp(refEndTime) * 1000
+
 
 today = datetime.today()
 v = datetime.combine(today, time.min)
@@ -167,5 +229,17 @@ currentStartTime = (
 )
 currenEndTime = int(t.mktime(v.timetuple())) * 1000 - int(5.5 * 60 * 60 * 1000) - 1000
 
-print(currentStartTime)
-print(currenEndTime)
+refDataFrame = getValuesV2(totalTags, refStartTime, refEndTime).drop(["time"], axis=1)
+
+currentDataFrame = getValuesV2(totalTags, currentStartTime, currenEndTime).drop(
+    ["time"], axis=1
+)
+
+report = Report(
+    metrics=[
+        DataDriftPreset(),
+    ]
+)
+
+report.run(reference_data=refDataFrame, current_data=currentDataFrame)
+report.save_html("datadrift.html")
