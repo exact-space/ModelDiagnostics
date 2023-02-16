@@ -4,7 +4,11 @@ from evidently import ColumnMapping
 
 from evidently.report import Report
 from evidently.metrics.base_metric import generate_column_metrics
-from evidently.metric_preset import DataDriftPreset, TargetDriftPreset
+from evidently.metric_preset import (
+    DataDriftPreset,
+    TargetDriftPreset,
+    DataQualityPreset,
+)
 from evidently.metrics import *
 
 from evidently.test_suite import TestSuite
@@ -139,6 +143,34 @@ def downloadingFile(fileName):
     print("Downloading completed for file " + str(fileName))
 
 
+def downloadingHTMLfile(fileName):
+    url = config["api"]["meta"] + "/attachments/modeldiagnostics/download/" + fileName
+    res = requests.get(url)
+    open(fileName, "wb").write(res.content)
+    print("Downloading completed for file " + str(fileName))
+
+
+def uploadTrainingResults(path, fileName):
+    files = {"upload_file": open(str(path + fileName), "rb")}
+    url = config["api"]["meta"] + "/attachments/modeldiagnostics/upload"
+
+    response = requests.post(url, files=files)
+    print("uploading")
+    print(url)
+    print("+" * 20)
+    print("response", response)
+
+    if response.status_code == 200:
+        print(fileName + " uploaded successfully....")
+        status = "success"
+        print(path + fileName)
+        # os.remove(str(path+fileName))
+    else:
+        print(fileName + " did not uploaded successfully....")
+        status = str(response.status_code) + str(response.content)
+    return status
+
+
 def gettingTimeStamp(date):
     date = datetime.strptime(date, "%d-%m-%YT%H:%M:%S")
     timestamp = datetime.timestamp(date)
@@ -223,7 +255,7 @@ refEndTime = gettingTimeStamp(refEndTime) * 1000
 
 today = datetime.today()
 v = datetime.combine(today, time.min)
-l = v - timedelta(days=3)
+l = v - timedelta(days=15)
 currentStartTime = (
     int(t.mktime(l.timetuple())) * 1000 - int(5.5 * 60 * 60 * 1000) - 1000
 )
@@ -235,11 +267,11 @@ currentDataFrame = getValuesV2(totalTags, currentStartTime, currenEndTime).drop(
     ["time"], axis=1
 )
 
-report = Report(
-    metrics=[
-        DataDriftPreset(),
-    ]
-)
+report = Report(metrics=[DataDriftPreset(), DataQualityPreset()])
+
+savingname = modelId + "_Version" + str(currentVersion) + "_ANN_Regression"
 
 report.run(reference_data=refDataFrame, current_data=currentDataFrame)
-report.save_html("datadrift.html")
+report.save_html(savingname + ".html")
+
+uploadTrainingResults("C:\\karyalay\\ModelDiagnostics\\main\\", savingname + ".html")
