@@ -241,8 +241,8 @@ versionHist, currentVersion = getLatestVersionHistoryFromModelId(modelId)
 h5FileName = modelId + "_Version" + str(currentVersion) + "_ANN_Regression.h5"
 transFileName = modelId + "_Version" + str(currentVersion) + "_Transformer.pkl"
 
-# downloadingFile(h5FileName)
-# downloadingFile(transFileName)
+downloadingFile(h5FileName)
+downloadingFile(transFileName)
 
 
 refStartTime = versionHist["modelTime"]["train"]
@@ -267,11 +267,27 @@ currentDataFrame = getValuesV2(totalTags, currentStartTime, currenEndTime).drop(
     ["time"], axis=1
 )
 
-report = Report(metrics=[DataDriftPreset(), DataQualityPreset()])
+target = currentDataFrame[outputTags]
 
-savingname = modelId + "_Version" + str(currentVersion) + "_ANN_Regression"
+transformer = pickle.load(open(transFileName, "rb"))
+inputDftransRef = transformer.transform(currentDataFrame)
+annModel = keras.models.load_model(h5FileName)
+yPredRef = annModel.predict(inputDftransRef)
+yPredDfRef = pd.DataFrame(yPredRef, columns=outputTags)
+
+inputDftransCur = transformer.transform(currentDataFrame)
+annModel = keras.models.load_model(h5FileName)
+yPredCur = annModel.predict(inputDftransCur)
+yPredCur = pd.DataFrame(yPredCur, columns=outputTags)
+
+
+report = Report(metrics=[DataDriftPreset()])
+
+savingname = modelId + "_Version" + str(currentVersion)
 
 report.run(reference_data=refDataFrame, current_data=currentDataFrame)
 report.save_html(savingname + ".html")
 
-uploadTrainingResults("C:\\karyalay\\ModelDiagnostics\\main\\", savingname + ".html")
+
+# uploadTrainingResults("C:\\karyalay\\ModelDiagnostics\\main\\", savingname + ".html")
+
