@@ -4,16 +4,18 @@ from evidently import ColumnMapping
 
 from evidently.report import Report
 from evidently.metrics.base_metric import generate_column_metrics
-from evidently.metric_preset import (
-    DataDriftPreset,
-    TargetDriftPreset,
-    DataQualityPreset,
-)
+
 from evidently.metrics import *
 
 from evidently.test_suite import TestSuite
 from evidently.tests.base_test import generate_column_tests
 from evidently.test_preset import DataStabilityTestPreset, NoTargetPerformanceTestPreset
+from evidently.metric_preset import (
+    TargetDriftPreset,
+    RegressionPreset,
+    DataDriftPreset,
+    DataQualityPreset,
+)
 from evidently.tests import *
 
 warnings.filterwarnings("ignore")
@@ -228,11 +230,14 @@ modelId = "63a0b29d8c8c0600070c22e0"
 
 modelDetails = getModelFromId(modelId)
 
+
 # getting model details:
 modelTags = getTagsFromModelDetailes(modelDetails)
 
 inputTags = modelTags["inputTags"]
 outputTags = modelTags["outputTags"]
+
+
 totalTags = inputTags + outputTags
 
 
@@ -267,27 +272,46 @@ currentDataFrame = getValuesV2(totalTags, currentStartTime, currenEndTime).drop(
     ["time"], axis=1
 )
 
-target = currentDataFrame[outputTags]
+target = "outputTags"
 
 transformer = pickle.load(open(transFileName, "rb"))
-inputDftransRef = transformer.transform(currentDataFrame)
+inputDftransRef = transformer.transform(refDataFrame)
 annModel = keras.models.load_model(h5FileName)
 yPredRef = annModel.predict(inputDftransRef)
-yPredDfRef = pd.DataFrame(yPredRef, columns=outputTags)
+yPredDfRef = pd.DataFrame(yPredRef, columns=["prediction"]).reset_index(drop=True)
+
+finalRef = pd.concat([refDataFrame, yPredDfRef], axis=1)
+finalRef = finalRef.rename(columns={outputTags[0]: "target"})
+
 
 inputDftransCur = transformer.transform(currentDataFrame)
 annModel = keras.models.load_model(h5FileName)
 yPredCur = annModel.predict(inputDftransCur)
-yPredCur = pd.DataFrame(yPredCur, columns=outputTags)
+
+yPredCur = pd.DataFrame(yPredCur, columns=["prediction"]).reset_index(drop=True)
+
+finalCur = pd.concat([currentDataFrame, yPredCur], axis=1)
+
+finalCur = finalCur.rename(columns={outputTags[0]: "target"})
 
 
-report = Report(metrics=[DataDriftPreset()])
+reportData = Report(metrics=[DataDriftPreset(), DataDriftTable(), DataQualityPreset()])
+
+# reportModel = Report(metrics=[RegressionPerformanceMetrics(), RegressionPredictedVsActualPlot(), RegressionErrorDistribution()])
+reportModel = Report(metrics=[RegressionPreset()])
 
 savingname = modelId + "_Version" + str(currentVersion)
 
-report.run(reference_data=refDataFrame, current_data=currentDataFrame)
-report.save_html(savingname + ".html")
+reportData.run(reference_data=finalRef, current_data=finalCur)
+reportData.save_html(savingname + "data.html")
+
+reportModel.run(reference_data=finalRef, current_data=finalCur)
+reportModel.save_html(savingname + "model.html")
 
 
-# uploadTrainingResults("C:\\karyalay\\ModelDiagnostics\\main\\", savingname + ".html")
-
+uploadTrainingResults(
+    "C:\\karyalay\\ModelDiagnostics\\main\\", savingname + "data.html"
+)
+uploadTrainingResults(
+    "C:\\karyalay\\ModelDiagnostics\\main\\", savingname + "model.html"
+)
