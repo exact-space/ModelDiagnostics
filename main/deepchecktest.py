@@ -8,8 +8,8 @@ import requests
 
 from deepchecks.tabular import datasets
 
-# from deepchecks.tabular import Dataset
-# from deepchecks.tabular.suites import data_integrity
+from deepchecks.tabular import Dataset
+from deepchecks.tabular.suites import data_integrity
 
 
 import os
@@ -66,6 +66,11 @@ from sklearn.preprocessing import MinMaxScaler
 import logging as lg
 
 
+global lag_inputs, forecast_steps
+lag_inputs = 60
+forecast_steps = 5
+
+
 def getModelFromId(modelId):
     query = {"id": modelId}
     urlQuery = (
@@ -103,6 +108,53 @@ def getTagsFromModelDetailes(modelDetails):
     }
 
     return modelDict
+
+
+def prepare_data2(lagDf, lag_inputs, forecast_steps, target_cols, feature_cols):
+    print("Customizing data for training")
+    # Convert the input dataframe to a numpy array
+    data = lagDf.drop(target_cols, axis=1).values
+
+    # Create arrays for the lagged inputs and target columns
+    print(len(lagDf), lag_inputs, forecast_steps)
+    input_data = np.zeros(
+        (len(lagDf) - lag_inputs - forecast_steps + 1, lag_inputs * data.shape[1])
+    )
+    target_data = np.zeros(
+        (
+            len(lagDf) - lag_inputs - forecast_steps + 1,
+            forecast_steps * len(target_cols),
+        )
+    )
+    for i in range(lag_inputs, len(lagDf) - forecast_steps + 1):
+        input_data[i - lag_inputs, :] = data[i - lag_inputs : i, :].flatten()
+        target_data[i - lag_inputs, :] = lagDf.loc[
+            lagDf.index[i : i + forecast_steps], target_cols
+        ].values.flatten()
+
+    # Combine the lagged inputs and target columns into a single numpy array
+    new_data = np.concatenate((input_data, target_data), axis=1)
+
+    # Create a new dataframe from the combined numpy array
+    new_columns = [
+        f"{column}_lag{i}"
+        for i in range(1, lag_inputs + 1)
+        for column in lagDf.columns
+        if column not in target_cols
+    ]
+    inputColumns = [
+        f"{column}_lag{i}" for i in range(1, lag_inputs + 1) for column in feature_cols
+    ]
+
+    outputColumns = []
+    for i in range(1, forecast_steps + 1):
+        for target_col in target_cols:
+            outputColumns.append(f"{target_col}_t+{i}")
+
+    new_columns = new_columns + outputColumns
+    new_df = pd.DataFrame(new_data, columns=new_columns)
+
+    return new_df, inputColumns, outputColumns
 
 
 def getLatestVersionHistoryFromModelId(modelId):
@@ -213,7 +265,7 @@ def getValuesV2(tagList, startTime, endTime):
     return finalDF
 
 
-modelId = "63a0b29d8c8c0600070c22e0"  # first model
+modelId = "641a9edc27caeb0007732d5a"  # first model
 
 # modelId = "63a292cdf2a0f8000741e8aa"
 
@@ -245,6 +297,16 @@ refEndTime = versionHist["modelTime"]["train"]
 refEndTime = refEndTime[0]["endTime"]
 refEndTime = gettingTimeStamp(refEndTime) * 1000
 
+
+# test
+refTestTime = versionHist["modelTime"]["test"]
+refTestTime = refTestTime[0]["startTime"]
+refTestTime = gettingTimeStamp(refTestTime) * 1000
+refTestEndTime = versionHist["modelTime"]["test"]
+refTestEndTime = refTestEndTime[0]["endTime"]
+refTestEndTime = gettingTimeStamp(refTestEndTime) * 1000
+
+
 today = datetime.today()
 v = datetime.combine(today, time.min)
 l = v - timedelta(days=15)
@@ -253,31 +315,79 @@ currentStartTime = (
 )
 currenEndTime = int(t.mktime(v.timetuple())) * 1000 - int(5.5 * 60 * 60 * 1000) - 1000
 
-currentDataFrame = getValuesV2(totalTags, currentStartTime, currenEndTime).drop(
+currentDataFrame = getValuesV2(totalTags, refStartTime, refEndTime).drop(
     ["time"], axis=1
 )
 
-# Metadata attributes are optional. Some checks will run only if specific attributes are declared.
-refDataFrame = getValuesV2(totalTags, refStartTime, refEndTime).drop(["time"], axis=1)
-from deepchecks.tabular import datasets
-from deepchecks.tabular.suites import data_integrity
+
+# testDf = getValuesV2(totalTags, refTestTime, refTestEndTime).drop(["time"], axis=1)
+# trainDf = getValuesV2(totalTags, refStartTime, refEndTime).drop(["time"], axis=1)
+
+# X_train, inputColumnsTrain, outputColumnsTrain = prepare_data2(
+#     trainDf, lag_inputs, forecast_steps, outputTags, inputTags
+# )
+# X_test, inputColumnsTrain, outputColumnsTrain = prepare_data2(
+#     testDf, lag_inputs, forecast_steps, outputTags, inputTags
+# )
+
+
+# y_train = X_train[outputColumnsTrain]
+# y_test = X_test[outputColumnsTrain]
+# X_train = X_train[inputColumnsTrain]
+# X_test = X_test[inputColumnsTrain]
+
+
+# transformer = pickle.load(open(transFileName, "rb"))
+
+# annModel = keras.models.load_model(h5FileName)
+
+
 from deepchecks.tabular import Dataset
+
+# dsTrain = Dataset(X_train, label=outputColumnsTrain)
+# dsTest = Dataset(X_test, label= outputColumnsTrain)
+
+# from deepchecks.tabular.suites import full_suite
+
+
 
 ds = Dataset(currentDataFrame)
 
 # Run Suite:
 integ_suite = data_integrity()
 suite_result = integ_suite.run(ds)
+
+
+
 savingname = modelId + "_Version" + str(currentVersion)
-# Note: the result can be saved as html using suite_result.save_as_html()
-# "# or exported to json using suite_result.to_json()
-# suite_result.show()"
+
 suite_result.save_as_html(savingname + "data.html")
+
+# # Note: the result can be saved as html using suite_result.save_as_html()
+# # or exported to json using suite_result.to_json()
+# suite_result.show()
+# suite_result.save_as_html()
 
 
 uploadTrainingResults(
     "C:\\karyalay\\ModelDiagnostics\\main\\", savingname + "data.html"
 )
+# uploadTrainingResults(
+#     "C:\\karyalay\\ModelDiagnostics\\main\\", savingname + "model.html"
+# )
+
+# evaluation_suite = model_evaluation()
+# suite_result = evaluation_suite.run(train_ds, test_ds, gbr)
+# Note: the result can be saved as html using suite_result.save_as_html()
+# or exported to json using suite_result.to_json()
+
+# suite_result = suite.run(train_dataset=dsTrain, test_dataset=dsTest, model=annModel)
+# suite_result.save_as_html(savingname + "model.html")
+
+
+# uploadTrainingResults(
+#     "C:\\karyalay\\ModelDiagnostics\\main\\", savingname + "model.html"
+# )
 # uploadTrainingResults(
 #     "C:\\karyalay\\ModelDiagnostics\\main\\", savingname + "model.html"
 # )
