@@ -265,129 +265,117 @@ def getValuesV2(tagList, startTime, endTime):
     return finalDF
 
 
-modelId = "641a9edc27caeb0007732d5a"  # first model
+def dataDeviation(modelId):
+    # modelId = "641a9edc27caeb0007732d5a"  # first model
 
-# modelId = "63a292cdf2a0f8000741e8aa"
+    # modelId = "63a292cdf2a0f8000741e8aa"
 
+    modelDetails = getModelFromId(modelId)
 
-modelDetails = getModelFromId(modelId)
+    # getting model details:
+    modelTags = getTagsFromModelDetailes(modelDetails)
 
+    inputTags = modelTags["inputTags"]
+    outputTags = modelTags["outputTags"]
 
-# getting model details:
-modelTags = getTagsFromModelDetailes(modelDetails)
+    totalTags = inputTags + outputTags
 
-inputTags = modelTags["inputTags"]
-outputTags = modelTags["outputTags"]
+    versionHist, currentVersion = getLatestVersionHistoryFromModelId(modelId)
 
-totalTags = inputTags + outputTags
+    # h5FileName = modelId + "_Version" + str(currentVersion) + "_ANN_Regression.h5"
+    # transFileName = modelId + "_Version" + str(currentVersion) + "_Transformer.pkl"
 
-versionHist, currentVersion = getLatestVersionHistoryFromModelId(modelId)
+    # downloadingFile(h5FileName)
+    # downloadingFile(transFileName)
 
-# h5FileName = modelId + "_Version" + str(currentVersion) + "_ANN_Regression.h5"
-# transFileName = modelId + "_Version" + str(currentVersion) + "_Transformer.pkl"
+    refStartTime = versionHist["modelTime"]["train"]
+    refStartTime = refStartTime[0]["startTime"]
+    refStartTime = gettingTimeStamp(refStartTime) * 1000
+    refEndTime = versionHist["modelTime"]["train"]
+    refEndTime = refEndTime[0]["endTime"]
+    refEndTime = gettingTimeStamp(refEndTime) * 1000
 
-# downloadingFile(h5FileName)
-# downloadingFile(transFileName)
+    # test
+    refTestTime = versionHist["modelTime"]["test"]
+    refTestTime = refTestTime[0]["startTime"]
+    refTestTime = gettingTimeStamp(refTestTime) * 1000
+    refTestEndTime = versionHist["modelTime"]["test"]
+    refTestEndTime = refTestEndTime[0]["endTime"]
+    refTestEndTime = gettingTimeStamp(refTestEndTime) * 1000
 
+    today = datetime.today()
+    v = datetime.combine(today, time.min)
+    l = v - timedelta(days=15)
+    currentStartTime = (
+        int(t.mktime(l.timetuple())) * 1000 - int(5.5 * 60 * 60 * 1000) - 1000
+    )
+    currenEndTime = (
+        int(t.mktime(v.timetuple())) * 1000 - int(5.5 * 60 * 60 * 1000) - 1000
+    )
 
-refStartTime = versionHist["modelTime"]["train"]
-refStartTime = refStartTime[0]["startTime"]
-refStartTime = gettingTimeStamp(refStartTime) * 1000
-refEndTime = versionHist["modelTime"]["train"]
-refEndTime = refEndTime[0]["endTime"]
-refEndTime = gettingTimeStamp(refEndTime) * 1000
+    currentDataFrame = getValuesV2(totalTags, refStartTime, refEndTime).drop(
+        ["time"], axis=1
+    )
 
+    # testDf = getValuesV2(totalTags, refTestTime, refTestEndTime).drop(["time"], axis=1)
+    # trainDf = getValuesV2(totalTags, refStartTime, refEndTime).drop(["time"], axis=1)
 
-# test
-refTestTime = versionHist["modelTime"]["test"]
-refTestTime = refTestTime[0]["startTime"]
-refTestTime = gettingTimeStamp(refTestTime) * 1000
-refTestEndTime = versionHist["modelTime"]["test"]
-refTestEndTime = refTestEndTime[0]["endTime"]
-refTestEndTime = gettingTimeStamp(refTestEndTime) * 1000
+    # X_train, inputColumnsTrain, outputColumnsTrain = prepare_data2(
+    #     trainDf, lag_inputs, forecast_steps, outputTags, inputTags
+    # )
+    # X_test, inputColumnsTrain, outputColumnsTrain = prepare_data2(
+    #     testDf, lag_inputs, forecast_steps, outputTags, inputTags
+    # )
 
+    # y_train = X_train[outputColumnsTrain]
+    # y_test = X_test[outputColumnsTrain]
+    # X_train = X_train[inputColumnsTrain]
+    # X_test = X_test[inputColumnsTrain]
 
-today = datetime.today()
-v = datetime.combine(today, time.min)
-l = v - timedelta(days=15)
-currentStartTime = (
-    int(t.mktime(l.timetuple())) * 1000 - int(5.5 * 60 * 60 * 1000) - 1000
-)
-currenEndTime = int(t.mktime(v.timetuple())) * 1000 - int(5.5 * 60 * 60 * 1000) - 1000
+    # transformer = pickle.load(open(transFileName, "rb"))
 
-currentDataFrame = getValuesV2(totalTags, refStartTime, refEndTime).drop(
-    ["time"], axis=1
-)
+    # annModel = keras.models.load_model(h5FileName)
 
+    from deepchecks.tabular import Dataset
 
-# testDf = getValuesV2(totalTags, refTestTime, refTestEndTime).drop(["time"], axis=1)
-# trainDf = getValuesV2(totalTags, refStartTime, refEndTime).drop(["time"], axis=1)
+    # dsTrain = Dataset(X_train, label=outputColumnsTrain)
+    # dsTest = Dataset(X_test, label= outputColumnsTrain)
 
-# X_train, inputColumnsTrain, outputColumnsTrain = prepare_data2(
-#     trainDf, lag_inputs, forecast_steps, outputTags, inputTags
-# )
-# X_test, inputColumnsTrain, outputColumnsTrain = prepare_data2(
-#     testDf, lag_inputs, forecast_steps, outputTags, inputTags
-# )
+    # from deepchecks.tabular.suites import full_suite
 
+    ds = Dataset(currentDataFrame)
 
-# y_train = X_train[outputColumnsTrain]
-# y_test = X_test[outputColumnsTrain]
-# X_train = X_train[inputColumnsTrain]
-# X_test = X_test[inputColumnsTrain]
+    # Run Suite:
+    integ_suite = data_integrity()
+    suite_result = integ_suite.run(ds)
 
+    savingname = modelId + "_Version" + str(currentVersion)
 
-# transformer = pickle.load(open(transFileName, "rb"))
+    suite_result.save_as_html(savingname + "data.html")
 
-# annModel = keras.models.load_model(h5FileName)
+    # # Note: the result can be saved as html using suite_result.save_as_html()
+    # # or exported to json using suite_result.to_json()
+    # suite_result.show()
+    # suite_result.save_as_html()
 
+    uploadTrainingResults(
+        "C:\\karyalay\\ModelDiagnostics\\main\\", savingname + "data.html"
+    )
+    # uploadTrainingResults(
+    #     "C:\\karyalay\\ModelDiagnostics\\main\\", savingname + "model.html"
+    # )
 
-from deepchecks.tabular import Dataset
+    # evaluation_suite = model_evaluation()
+    # suite_result = evaluation_suite.run(train_ds, test_ds, gbr)
+    # Note: the result can be saved as html using suite_result.save_as_html()
+    # or exported to json using suite_result.to_json()
 
-# dsTrain = Dataset(X_train, label=outputColumnsTrain)
-# dsTest = Dataset(X_test, label= outputColumnsTrain)
+    # suite_result = suite.run(train_dataset=dsTrain, test_dataset=dsTest, model=annModel)
+    # suite_result.save_as_html(savingname + "model.html")
 
-# from deepchecks.tabular.suites import full_suite
-
-
-
-ds = Dataset(currentDataFrame)
-
-# Run Suite:
-integ_suite = data_integrity()
-suite_result = integ_suite.run(ds)
-
-
-
-savingname = modelId + "_Version" + str(currentVersion)
-
-suite_result.save_as_html(savingname + "data.html")
-
-# # Note: the result can be saved as html using suite_result.save_as_html()
-# # or exported to json using suite_result.to_json()
-# suite_result.show()
-# suite_result.save_as_html()
-
-
-uploadTrainingResults(
-    "C:\\karyalay\\ModelDiagnostics\\main\\", savingname + "data.html"
-)
-# uploadTrainingResults(
-#     "C:\\karyalay\\ModelDiagnostics\\main\\", savingname + "model.html"
-# )
-
-# evaluation_suite = model_evaluation()
-# suite_result = evaluation_suite.run(train_ds, test_ds, gbr)
-# Note: the result can be saved as html using suite_result.save_as_html()
-# or exported to json using suite_result.to_json()
-
-# suite_result = suite.run(train_dataset=dsTrain, test_dataset=dsTest, model=annModel)
-# suite_result.save_as_html(savingname + "model.html")
-
-
-# uploadTrainingResults(
-#     "C:\\karyalay\\ModelDiagnostics\\main\\", savingname + "model.html"
-# )
-# uploadTrainingResults(
-#     "C:\\karyalay\\ModelDiagnostics\\main\\", savingname + "model.html"
-# )
+    # uploadTrainingResults(
+    #     "C:\\karyalay\\ModelDiagnostics\\main\\", savingname + "model.html"
+    # )
+    # uploadTrainingResults(
+    #     "C:\\karyalay\\ModelDiagnostics\\main\\", savingname + "model.html"
+    # )
