@@ -133,36 +133,52 @@ regression_perfomance_dashboard.calculate(
 regression_perfomance_dashboard.save("prod.html")
 
 
-current_prediction = regressor.predict(current[numerical_features + categorical_features])
-current['prediction'] = current_prediction
+current_prediction = regressor.predict(
+    current[numerical_features + categorical_features]
+)
+current["prediction"] = current_prediction
 
 
-regression_perfomance_dashboard.calculate(reference, current.loc['2011-01-29 00:00:00':'2011-02-07 23:00:00'], 
-                                            column_mapping=column_mapping)
-regression_perfomance_dashboard.save('week1results.html')
-
+regression_perfomance_dashboard.calculate(
+    reference,
+    current.loc["2011-01-29 00:00:00":"2011-02-07 23:00:00"],
+    column_mapping=column_mapping,
+)
+regression_perfomance_dashboard.save("week1results.html")
 
 
 RegressionPerformanceTab.list_widgets()
 
 
-regression_perfomance_dashboard = Dashboard(tabs=[RegressionPerformanceTab(include_widgets=[
-    'Regression Model Performance Report.',
-    'Reference: Model Quality (+/- std)',
-    'Current: Model Quality (+/- std)',
-    'Current: Error (Predicted - Actual)',
-    'Current: Error Distribution',
-])])
-regression_perfomance_dashboard.calculate(reference, current.loc['2011-02-07 00:00:00':'2011-02-14 23:00:00'], 
-                                            column_mapping=column_mapping)
+regression_perfomance_dashboard = Dashboard(
+    tabs=[
+        RegressionPerformanceTab(
+            include_widgets=[
+                "Regression Model Performance Report.",
+                "Reference: Model Quality (+/- std)",
+                "Current: Model Quality (+/- std)",
+                "Current: Error (Predicted - Actual)",
+                "Current: Error Distribution",
+            ]
+        )
+    ]
+)
+regression_perfomance_dashboard.calculate(
+    reference,
+    current.loc["2011-02-07 00:00:00":"2011-02-14 23:00:00"],
+    column_mapping=column_mapping,
+)
 
 
-regression_perfomance_dashboard.save('week2results.html')
+regression_perfomance_dashboard.save("week2results.html")
 
 
-regression_perfomance_dashboard.calculate(reference, current.loc['2011-02-15 00:00:00':'2011-02-21 23:00:00'], 
-                                            column_mapping=column_mapping)
-regression_perfomance_dashboard.save('week3results.html')
+regression_perfomance_dashboard.calculate(
+    reference,
+    current.loc["2011-02-15 00:00:00":"2011-02-21 23:00:00"],
+    column_mapping=column_mapping,
+)
+regression_perfomance_dashboard.save("week3results.html")
 
 
 column_mapping_drift = ColumnMapping()
@@ -173,59 +189,61 @@ column_mapping_drift.numerical_features = numerical_features
 column_mapping_drift.categorical_features = []
 
 
-
 data_drift_dashboard = Dashboard(tabs=[DataDriftTab()])
-data_drift_dashboard.calculate(reference,
-                               current.loc['2011-02-14 00:00:00':'2011-02-21 23:00:00'], 
-                               column_mapping_drift
-                              )
+data_drift_dashboard.calculate(
+    reference,
+    current.loc["2011-02-14 00:00:00":"2011-02-21 23:00:00"],
+    column_mapping_drift,
+)
 
-regression_perfomance_dashboard.save('week4results.html')
-
+regression_perfomance_dashboard.save("week4results.html")
 
 
 from evidently.calculations.stattests import StatTest
 
-def _anderson_stat_test(reference_data: pd.Series, current_data: pd.Series, feature_type: str, threshold: float):
+
+def _anderson_stat_test(
+    reference_data: pd.Series,
+    current_data: pd.Series,
+    feature_type: str,
+    threshold: float,
+):
     p_value = anderson_ksamp(np.array([reference_data, current_data]))[2]
     return p_value, p_value < threshold
+
 
 anderson_stat_test = StatTest(
     name="anderson",
     display_name="Anderson test (p_value)",
     func=_anderson_stat_test,
-    allowed_feature_types=["num"]
+    allowed_feature_types=["num"],
 )
 
-options = DataDriftOptions(feature_stattest_func=anderson_stat_test, nbinsx=20, confidence=0.90)
+options = DataDriftOptions(
+    feature_stattest_func=anderson_stat_test, nbinsx=20, confidence=0.90
+)
 
 
 the_dashboard = Dashboard(
-    tabs=[RegressionPerformanceTab(include_widgets=[
-                                    'Regression Model Performance Report.',
-                                    'Reference: Model Quality (+/- std)',
-                                    'Current: Model Quality (+/- std)',
-                                    'Current: Error (Predicted - Actual)',
-                                    'Current: Error Distribution',]
-                                  ),
-          DataDriftTab()],
-    options=[options])
-                                
-the_dashboard.calculate(reference,
-                        current.loc['2011-02-14 00:00:00':'2011-02-21 23:00:00'], 
-                        column_mapping_drift)
+    tabs=[
+        RegressionPerformanceTab(
+            include_widgets=[
+                "Regression Model Performance Report.",
+                "Reference: Model Quality (+/- std)",
+                "Current: Model Quality (+/- std)",
+                "Current: Error (Predicted - Actual)",
+                "Current: Error Distribution",
+            ]
+        ),
+        DataDriftTab(),
+    ],
+    options=[options],
+)
 
-regression_perfomance_dashboard.save('weekoptimiseresults.html')
+the_dashboard.calculate(
+    reference,
+    current.loc["2011-02-14 00:00:00":"2011-02-21 23:00:00"],
+    column_mapping_drift,
+)
 
-
-
-
-
-
-
-
-
-
-
-
-
+regression_perfomance_dashboard.save("weekoptimiseresults.html")

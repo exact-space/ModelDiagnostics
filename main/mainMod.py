@@ -226,7 +226,10 @@ def getValuesV2(tagList, startTime, endTime):
     return finalDF
 
 
-modelId = "63a0b29d8c8c0600070c22e0"
+modelId = "63a0b29d8c8c0600070c22e0"  # first model
+
+# modelId = "63a292cdf2a0f8000741e8aa"
+
 
 modelDetails = getModelFromId(modelId)
 
@@ -260,25 +263,29 @@ refEndTime = gettingTimeStamp(refEndTime) * 1000
 
 today = datetime.today()
 v = datetime.combine(today, time.min)
-l = v - timedelta(days=15)
+l = v - timedelta(days=30)
 currentStartTime = (
     int(t.mktime(l.timetuple())) * 1000 - int(5.5 * 60 * 60 * 1000) - 1000
 )
 currenEndTime = int(t.mktime(v.timetuple())) * 1000 - int(5.5 * 60 * 60 * 1000) - 1000
 
-refDataFrame = getValuesV2(totalTags, refStartTime, refEndTime).drop(["time"], axis=1)
+# refDataFrame = getValuesV2(totalTags, refStartTime, refEndTime).drop(["time"], axis=1)
+refDataFrame = getValuesV2(totalTags, refStartTime, refEndTime)
+
 
 currentDataFrame = getValuesV2(totalTags, currentStartTime, currenEndTime).drop(
     ["time"], axis=1
 )
 
-target = "outputTags"
 
 transformer = pickle.load(open(transFileName, "rb"))
 inputDftransRef = transformer.transform(refDataFrame)
 annModel = keras.models.load_model(h5FileName)
 yPredRef = annModel.predict(inputDftransRef)
+
+
 yPredDfRef = pd.DataFrame(yPredRef, columns=["prediction"]).reset_index(drop=True)
+
 
 finalRef = pd.concat([refDataFrame, yPredDfRef], axis=1)
 finalRef = finalRef.rename(columns={outputTags[0]: "target"})
@@ -297,7 +304,13 @@ finalCur = finalCur.rename(columns={outputTags[0]: "target"})
 
 reportData = Report(metrics=[DataDriftPreset(), DataDriftTable(), DataQualityPreset()])
 
-# reportModel = Report(metrics=[RegressionPerformanceMetrics(), RegressionPredictedVsActualPlot(), RegressionErrorDistribution()])
+reportModel = Report(
+    metrics=[
+        RegressionPerformanceMetrics(),
+        RegressionPredictedVsActualPlot(),
+        RegressionErrorDistribution(),
+    ]
+)
 reportModel = Report(metrics=[RegressionPreset()])
 
 savingname = modelId + "_Version" + str(currentVersion)

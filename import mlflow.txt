@@ -1,0 +1,43 @@
+import mlflow
+import mlflow.sklearn
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+
+# Set tracking URI
+mlflow.set_tracking_uri("http://localhost:5000")
+
+# Start a new MLflow run
+with mlflow.start_run():
+
+    # Load data
+    data = pd.read_csv("data.csv")
+    X = data.drop("target", axis=1)
+    y = data["target"]
+
+    # Split data into training and validation sets
+    X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    # Train a logistic regression model
+    model = LogisticRegression()
+    model.fit(X_train, y_train)
+
+    # Evaluate model on validation set
+    score = model.score(X_val, y_val)
+
+    # Log parameters and metrics to MLflow
+    mlflow.log_param("penalty", "l2")
+    mlflow.log_param("C", 1.0)
+    mlflow.log_metric("accuracy", score)
+
+    # Save model
+    mlflow.sklearn.log_model(model, "model")
+
+    # End MLflow run
+    mlflow.end_run()
+
+
+
+
+In this code snippet, we first set the MLflow tracking URI to point to a local server running on port 5000. We then start a new MLflow run and load some sample data. We split the data into training and validation sets, train a logistic regression model, and evaluate its performance on the validation set. We then log some parameters and metrics to MLflow, including the penalty used in the logistic regression model, the value of the regularization parameter C, and the accuracy score on the validation set. Finally, we save the trained model using the mlflow.sklearn.log_model function and end the MLflow run.
+
+Note that this is just a simple example, and in practice, you would likely have more complex workflows involving multiple models and datasets. However, this should give you a good starting point for using MLflow to track your machine learning experiments.
